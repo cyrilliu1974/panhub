@@ -33,3 +33,14 @@ panhub.shenzjd.com/vitest.config.ts.timestamp-*.mjs
 
 # WeChat mini-program: "构建 npm" output
 panhub.shenzjd.com/miniprogram/miniprogram_npm/
+
+# ─── 根目录不需要上传的文件 ─────────────────────
+# 备份文件（source.csv.bak / source.csv.pre-sort.bak 等）
+*.bak
+
+# 大体积生成物：浏览器存下的网盘搜尋儀表板快照（非源码，重跑即生）
+夸克網盤資源搜尋儀表板.html
+
+# 搜尋結果報表（每次重跑生成，非源碼）
+quark-search-results.json
+quark-search-results.csv
