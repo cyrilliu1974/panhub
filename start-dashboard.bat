@@ -7,7 +7,7 @@ echo  後端: http://localhost:4000
 echo  儀表板: http://localhost:8080
 echo =========================================
 echo [1/2] 啟動後端 (npm run dev) ...
-start "夸克後端" /MIN cmd /c "cd /d C:\AI\bdmv\panhub.shenzjd.com && npm run dev"
+start "夸克後端" /MIN cmd /c "cd /d %~dp0panhub.shenzjd.com && npm run dev"
 echo       後端已啟動（最小化視窗）
 echo.
 echo [*] 等待後端就緒...
@@ -26,7 +26,7 @@ echo   啟動完成！請在瀏覽器開啟 http://localhost:8080
 echo   停止方式：關閉這兩個視窗即可
 echo ==========================================
 echo.
-cd /d C:\AI\bdmv\panhub.shenzjd.com
+cd /d %~dp0panhub.shenzjd.com
 set PLUGIN_TIMEOUT_MS=60000
 node scripts\run-quark-dashboard.mjs
 pause

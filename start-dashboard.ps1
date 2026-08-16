@@ -10,7 +10,7 @@
 $ErrorActionPreference = "Stop"
 
 # ---------- 可調參數 ----------
-$ProjectDir = "C:\AI\bdmv\panhub.shenzjd.com"   # Nuxt 專案根目錄
+$ProjectDir = Join-Path $PSScriptRoot "panhub.shenzjd.com"   # Nuxt 專案根目錄（相對於腳本所在）
 $DashboardPort = 8080                            # 儀表板埠號
 $HealthUrl   = "http://localhost:4000/api/health" # 後端健康檢查（見下方說明）
 $PluginTimeoutMs = "60000"                        # 單次搜索超時（本機建議 60000）
