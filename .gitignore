@@ -1,0 +1,35 @@
+# ─── panhub.shenzjd.com/ 子项目 ───────────────────────
+# 只排除该子目录内不需要上传的文件
+
+# Node dependencies
+panhub.shenzjd.com/node_modules/
+
+# Nuxt build / dev outputs
+panhub.shenzjd.com/.nuxt/
+panhub.shenzjd.com/.output/
+panhub.shenzjd.com/.data/
+panhub.shenzjd.com/.nitro/
+panhub.shenzjd.com/.cache/
+panhub.shenzjd.com/dist/
+
+# Runtime data
+panhub.shenzjd.com/data/
+
+# Local env files
+panhub.shenzjd.com/.env
+panhub.shenzjd.com/.env.*
+
+# Script backups
+panhub.shenzjd.com/scripts/*.bak
+
+# IDE / tooling local data
+panhub.shenzjd.com/.claude/
+panhub.shenzjd.com/.codebuddy/
+panhub.shenzjd.com/.playwright-mcp/
+panhub.shenzjd.com/.workbuddy/
+
+# Vitest config-transform temp files
+panhub.shenzjd.com/vitest.config.ts.timestamp-*.mjs
+
+# WeChat mini-program: "构建 npm" output
+panhub.shenzjd.com/miniprogram/miniprogram_npm/
