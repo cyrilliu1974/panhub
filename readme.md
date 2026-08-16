@@ -93,6 +93,16 @@ node panhub.shenzjd.com/scripts/run-quark-dashboard.mjs
 儀表板常用參數：`PANHUB_BASE_URL`、`SOURCE_CSV`、`DASHBOARD_PORT`(8080)、`ROW_CONCURRENCY`(3)、`PLUGIN_TIMEOUT_MS`(15000)、`AUTOSTART_BACKEND`(1)、`ONLY_4K`(1)、`SEARCH_DELAY_MS`(1500)、`SEARCH_RETRIES`(3)、`SEARCH_SRC`(all)、`PLUGINS`(全部插件)。
 批次腳本除錯：`node panhub.shenzjd.com/scripts/batch-quark-search.mjs --self-test` / `--parse-only`（不需伺服器）。
 
+## 克隆與初始化 submodule
+本倉庫的搜尋站 `panhub.shenzjd.com/` 是以 **git submodule** 形式引入（指向 fork `cyrilliu1974/panhub.shenzjd.com`，已含本專案的批次腳本與儀表板修改）。克隆後需初始化 submodule 才能執行：
+```bash
+git clone --recurse-submodules https://github.com/cyrilliu1974/panhub.git
+# 或已克隆後再補：
+git submodule update --init --recursive
+cd panhub.shenzjd.com && npm install
+```
+submodule 自己的 `.gitignore` 已排除 `node_modules/`、`.nuxt/`、`.output/`、`.data/`、`.nitro/`、`.cache/`、`dist/` 等建置產物，根目錄 `.gitignore` 亦對其保留兜底規則。
+
 ## 重要限制
 - 真實搜尋依賴 `quark4k` 插件能連到 quark4k.com，且需先 `npm run dev` 起好後端；沙箱環境無法實跑。
 - 搜尋結果不含檔案大小欄位，「解析大小(參考)」是從內文猜測，可能缺失或不準，請勿用於自動判斷。
