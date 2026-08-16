@@ -103,6 +103,34 @@ cd panhub.shenzjd.com && npm install
 ```
 submodule 自己的 `.gitignore` 已排除 `node_modules/`、`.nuxt/`、`.output/`、`.data/`、`.nitro/`、`.cache/`、`dist/` 等建置產物，根目錄 `.gitignore` 亦對其保留兜底規則。
 
+## 發佈 dashboard 修改（submodule 流程）
+`panhub.shenzjd.com/` 是 submodule，故「修改 `scripts/dashboard.html` 後要讓別人下載到新版」**不能只推根倉庫**——必須先推 submodule，再回根倉庫更新指針。否則別人 clone 仍拿到舊版。
+
+**一鍵方式**（推薦）：在倉庫根目錄雙擊 `publish-dashboard.bat` 即可自動完成「submodule 提交+推送 → 根倉庫更新指針+推送」。可帶自訂提交訊息：
+```bat
+publish-dashboard.bat 修正複製按鈕邏輯
+```
+
+**手動方式**（順序不能反）：
+```bash
+cd panhub.shenzjd.com
+git add scripts/dashboard.html
+git commit -m "fix: dashboard 調整 XXX"
+git push origin main          # 先推 submodule（否則別人拉不到）
+
+cd ..
+git add panhub.shenzjd.com
+git commit -m "chore: 更新 submodule 至 dashboard 新版本"
+git push origin main          # 再推根倉庫（更新指針）
+```
+
+**防呆檢查**（推之前確認無遺漏）：兩個命令都無輸出才代表別人能拿到全部改動。
+```bash
+git -C panhub.shenzjd.com log origin/main..HEAD --oneline   # submodule 已推？
+git log origin/main..HEAD --oneline                          # 根倉庫已推？
+```
+> 注意：根目錄的 `夸克網盤資源搜尋儀表板.html`（1.2MB）是瀏覽器存的「結果快照」，非源碼，已被根目錄 `.gitignore` 排除，不在發佈範圍內。要分享的是 submodule 內的 `scripts/dashboard.html` 源碼。
+
 ## 重要限制
 - 真實搜尋依賴 `quark4k` 插件能連到 quark4k.com，且需先 `npm run dev` 起好後端；沙箱環境無法實跑。
 - 搜尋結果不含檔案大小欄位，「解析大小(參考)」是從內文猜測，可能缺失或不準，請勿用於自動判斷。
