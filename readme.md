@@ -5,34 +5,42 @@
 並以兩種方式呈現結果：
 
 - **批次腳本**：`panhub.shenzjd.com/scripts/batch-quark-search.mjs`（v1.1.6），離線產出 CSV/JSON 報表。
-- **一鍵儀表板**：`panhub.shenzjd.com/scripts/run-quark-dashboard.mjs`（v1.0.6）+ `dashboard.html`，
+- **一鍵儀表板**：`panhub.shenzjd.com/scripts/run-quark-dashboard.mjs`（v1.2.9）+ `dashboard.html`,
   「啟動即自動搜尋、自動開瀏覽器顯示 web 介面、SSE 即時推送進度與結果」。
   這正是「寫死流程、每次啟動自動基於 source.csv 搜尋並以 web 介面呈現」的實作。
 
 > 說明：因搜尋結果不回傳檔案大小（`Link` 只有 type/url/password），「影片容量」**不做過濾**，僅作輸出中的參考欄位。
 
-- `source.csv`：來源清單，三欄 `中文名,英文名,影片容量`（容量如 `58.1G`，補全列可留空 N/A）。
+- `source.csv`：來源清單，1~3 欄皆可——`中文名`（僅中文名亦可，會以中文名搜尋）/`中文名,英文名`/`中文名,英文名,影片容量`（容量如 `58.1G`，補全列可留空 N/A）。缺少的欄位視為空，不再因「欄位數不足」而靜默略過任何電影列。
 - `panhub.shenzjd.com/`：clone 自 https://github.com/wu529778790/panhub.shenzjd.com 的 Nuxt 網盤搜尋站，
   其後端自帶搜尋服務（插件 `quark4k` + TG 頻道），`/api/search` 即搜尋入口。
 - `panhub.shenzjd.com/scripts/batch-quark-search.mjs`：批次搜尋腳本（獨立執行，不動網站本體）。
-- `panhub.shenzjd.com/scripts/run-quark-dashboard.mjs` + `dashboard.html`：一鍵儀表板（自動搜尋 + web 介面）。
+- `panhub.shenzjd.com/scripts/run-quark-dashboard.mjs`（v1.2.8）+ `dashboard.html`（v1.2.1）：一鍵儀表板（自動搜尋 + web 介面，PURGE_ON_START 可關閉啟動整檔重掃）。
 - `enrich-source.mjs`：補全 `source.csv` 的資料腳本（清理英文名、修正錯誤、補中文-only 列、去重、補系列缺口），可重跑。
 - `sort-source.mjs`：將 `source.csv` 依系列群聚排序、並可補齊指定系列（如復仇者聯盟）的資料腳本，可重跑。
 
-## 儀表板（run-quark-dashboard.mjs v1.0.4 + dashboard.html）
+## 儀表板（run-quark-dashboard.mjs v1.2.9 + dashboard.html v1.2.1）
 **寫死流程、開箱即用**：只要 `node scripts/run-quark-dashboard.mjs`，程式就會：
 1. 讀 `source.csv`（自動跳過表頭，含 BOM 容錯）。
 2. 對每筆的「英文名 + **全部中文譯名**（`/` 分隔的各版本，如 `阿凡达：水之道/阿凡达2/阿凡达2：水之道` 拆成 3 個中文詞）」**分別**搜尋 `quark4k` 插件（`GET /api/search?res=results&src=plugin&plugins=quark4k`）；同一條連結若被多個譯名命中，以 URL 去重只計一次。
 3. 只保留 `type==='quark'` 的連結、依時間新→舊排序。
-4. 啟動本地 HTTP（預設 8080），透過 **SSE** 即時把 `reset/progress/snapshot/done` 推播到瀏覽器。
+4. **先**啟動本地 HTTP（預設 8080）並自動開瀏覽器，立即顯示「啟動中」進度橫幅；後端/清理等前置作業透過 **SSE** 的 `status` 事件即時回報（準備後端→清理已取消分享→開始搜尋），避免長時間白畫面讓人以為當掉。搜尋開始後改推 `reset/progress/snapshot/done`。
 5. **自動開啟瀏覽器**顯示儀表板：每部片一張卡片（中文名、英文名、影片容量、命中數、夸克連結含網址/提取碼/標題/時間），
    支援「只顯示有命中」「片名篩選」「一鍵複製網址/提取碼」「重新搜尋」按鈕（POST `/api/rerun`）。
+
+### 統一參數管理（.env / .env.example）
+所有可調參數集中於 `panhub.shenzjd.com/.env`（本機設定，已被 submodule `.gitignore` 排除，不進版本庫）與
+`panhub.shenzjd.com/.env.example`（發佈範本，隨 submodule 一併發佈）。腳本啟動時自帶極簡 `.env` 解析器自動載入，
+優先順序：**真實環境變數（含 start-dashboard.bat 設的）＞ `.env` ＞ `.env.example`**——故 `.env.example` 提供預設值、
+`.env` 覆寫預設、CI/手動設的環境變數再覆寫兩者。調參只需改 `.env`（或 `.env.example`）一處，不必動程式碼。
+完整變數清單見上方「儀表板常用參數」與「已取消分享檢查」段落；掃描頻率 `STALE_SCAN_DAYS` 亦在此統一管理。
 
 **後端自啟**：若 `node_modules` 已存在且 `AUTOSTART_BACKEND!=0`，程式會自動 `npm run dev` 拉起 panhub 後端；
 若後端連不上，結果為空但程式不崩潰（僅告警）。
 
 環境變數：`PANHUB_BASE_URL`(預設 `http://localhost:4000`)、`SOURCE_CSV`、`DASHBOARD_PORT`(8080)、
 `ROW_CONCURRENCY`(3)、`PLUGIN_TIMEOUT_MS`(15000)、`AUTOSTART_BACKEND`(1)。
+以上變數集中於 `panhub.shenzjd.com/.env` / `.env.example`，可統一調整（見下方「統一參數管理」）。
 
 ## 資料集 source.csv（v2 補全，2026-08-16）
 原 `source.csv`（v1，130 筆）經網路查證與補全，現為 **164 筆**：
@@ -90,8 +98,34 @@ node panhub.shenzjd.com/scripts/run-quark-dashboard.mjs
 #      程式會自己 npm run dev 拉起後端
 ```
 批次腳本常用參數：`PANHUB_BASE_URL`、`SOURCE_CSV`、`OUTPUT_DIR`、`ROW_CONCURRENCY`、`PLUGIN_TIMEOUT_MS`、`ONLY_4K`(1)、`SEARCH_DELAY_MS`(1500)、`SEARCH_RETRIES`(3)、`SEARCH_SRC`(all)、`PLUGINS`(全部插件)。除錯：`--self-test` / `--parse-only` / `--probe-first`（只用第 1 筆資料搜尋並印出診斷，不需完整跑全量）/ `--probe-keyword "<片名>"`（以任意指定關鍵字做診斷，不需改 CSV）。
-儀表板常用參數：`PANHUB_BASE_URL`、`SOURCE_CSV`、`DASHBOARD_PORT`(8080)、`ROW_CONCURRENCY`(3)、`PLUGIN_TIMEOUT_MS`(15000)、`AUTOSTART_BACKEND`(1)、`ONLY_4K`(1)、`SEARCH_DELAY_MS`(1500)、`SEARCH_RETRIES`(3)、`SEARCH_SRC`(all)、`PLUGINS`(全部插件)。
+儀表板常用參數：`PANHUB_BASE_URL`、`SOURCE_CSV`、`DASHBOARD_PORT`(8080)、`ROW_CONCURRENCY`(3)、`PLUGIN_TIMEOUT_MS`(15000)、`AUTOSTART_BACKEND`(1)、`ONLY_4K`(1)、`SEARCH_DELAY_MS`(1500)、`SEARCH_RETRIES`(3)、`SEARCH_SRC`(all)、`PLUGINS`(全部插件)、`RESUME`(auto：差分比對 source.csv，只搜新增/變動列、沿用已完成的)、`CHECK_CANCELED`(1)、`CANCEL_CONCURRENCY`(ROW_CONCURRENCY*2)、`STALE_SCAN_DAYS`(30：超過此天數未掃描的電影即使內容未變也重掃全部片源)、`PURGE_ON_START`(1：設 0 跳過啟動前整檔清理，僅在取得連結時即時攔截)、`QUARK_PURGE_CODES`(41011,41012,41019：視為失效應刪除的 code 清單)。以上參數集中於 `.env` / `.env.example`。
 批次腳本除錯：`node panhub.shenzjd.com/scripts/batch-quark-search.mjs --self-test` / `--parse-only`（不需伺服器）。
+
+## 兩個模組的執行方式（run-quark-dashboard.mjs / quark-cancel-check.mjs）
+> 搜尋後端（panhub.shenzjd.com）需先 `npm install` 並能連到 quark4k.com；沙箱環境無法實跑。
+
+### A. 一鍵儀表板 run-quark-dashboard.mjs（自動搜尋 + 自動開瀏覽器）
+```bash
+# 方式一：一鍵 bat（自動拉起後端 + 開瀏覽器，推薦）
+start-dashboard.bat
+
+# 方式二：手動（後端請自己先 npm run dev 起好，或讓程式 AUTOSTART_BACKEND 自啟）
+node panhub.shenzjd.com/scripts/run-quark-dashboard.mjs
+#   → 自動開啟 http://localhost:8080
+```
+- 啟動時會先對 `quark-search-results.json` 跑一次「已取消分享」清理（warm-cache，約 +30s），再開始搜尋；結果卡片點「重新搜尋」可 POST `/api/rerun` 重跑。
+- 常用環境變數：`PANHUB_BASE_URL`(localhost:4000)、`SOURCE_CSV`、`DASHBOARD_PORT`(8080)、`ROW_CONCURRENCY`(3)、`PLUGIN_TIMEOUT_MS`(15000)、`AUTOSTART_BACKEND`(1)、`ONLY_4K`(1)、`SEARCH_DELAY_MS`(1500)、`SEARCH_RETRIES`(3)、`SEARCH_SRC`(all)、`PLUGINS`(全部插件)、`CHECK_CANCELED`(1，設 0 關閉取消檢查)、`CANCEL_CONCURRENCY`(ROW_CONCURRENCY*2)、`QUARK_PURGE_CODES`(41011,41012,41019)、`STALE_SCAN_DAYS`(30)、`PURGE_ON_START`(1：設 0 跳過啟動前整檔清理，僅在取得連結時即時攔截)。所有參數統一集中於 `.env` / `.env.example`（見「統一參數管理」）。
+
+### B. 已取消分享檢查 quark-cancel-check.mjs（獨立清理 / 單筆檢查）
+```bash
+# 清理紀錄檔：移除所有已取消分享對應的 match 條目並寫回（同步 summary / matchCount）
+node panhub.shenzjd.com/scripts/quark-cancel-check.mjs purge [--json <path>] [--concurrency N] [--no-write] [--no-cache]
+# 單筆檢查某條分享連結是否已取消（stdout 印 JSON；已取消 exit 0，否則 exit 1）
+node panhub.shenzjd.com/scripts/quark-cancel-check.mjs check <url>
+```
+- `--json <path>`：指定紀錄檔（預設自動向上查找 `quark-search-results.json`，故從倉庫根目錄執行即可）；`--concurrency N`：並發數（預設 8）；`--no-write`：只試算不寫入；`--no-cache`：不讀寫快取（每次都打 API）。
+- 環境變數 `QUARK_CANCEL_CACHE`：可覆寫快取檔路徑（預設 `panhub.shenzjd.com/scripts/quark-cancel-cache.json`，與儀表板共用、已被 submodule `.gitignore` 排除）。
+- 這支模組一般不需手動跑——`run-quark-dashboard.mjs` 會在「取得 url 時」自動引入它攔截已取消分享，並於啟動時順便清理紀錄檔；手動跑適用於「單獨整理紀錄檔」或接 CLI / 排程定期清理。
 
 ## 克隆與初始化 submodule
 本倉庫的搜尋站 `panhub.shenzjd.com/` 是以 **git submodule** 形式引入（指向 fork `cyrilliu1974/panhub.shenzjd.com`，已含本專案的批次腳本與儀表板修改）。克隆後需初始化 submodule 才能執行：
@@ -135,7 +169,78 @@ git log origin/main..HEAD --oneline                          # 根倉庫已推�
 - 真實搜尋依賴 `quark4k` 插件能連到 quark4k.com，且需先 `npm run dev` 起好後端；沙箱環境無法實跑。
 - 搜尋結果不含檔案大小欄位，「解析大小(參考)」是從內文猜測，可能缺失或不準，請勿用於自動判斷。
 
+## 已取消分享檢查（quark-cancel-check.mjs）
+網盤分享會被分享者「取消」，前端顯示「该分享已被取消，无法访问」。本模組提供**持久化**的已取消分享檢查能力：可獨立執行清理 `quark-search-results.json`，亦可被 `run-quark-dashboard.mjs` 引入，在主程式「取得 url 時」先攔截已取消分享。
+模組位置：`panhub.shenzjd.com/scripts/quark-cancel-check.mjs`（與 dashboard 同目錄，隨 submodule 一併發佈）。
+
+**判定方式**：呼叫 Quark 分享頁 token API
+`POST https://drive-pc.quark.cn/1/clouddrive/share/sharepage/token`，body `{"pwd_id":"<id>","passcode":""}`；
+預設 `QUARK_PURGE_CODES=41011,41012,41019`（失效 / 已取消 / 過期失效）命中即視為「失效應刪除」——例如你回報的 `https://pan.quark.cn/s/d18226a28f34` 回 `41011 分享地址已失效`，本版起會刪除（舊版僅認 `41012` 故殘留）。`41022` 審核中與 `41004/41006/41010/41031` 等其他失效預設保留（避免過度刪除），網路錯誤一律保留。
+
+**獨立執行**：指令與參數（`purge` / `check`、`--json`、`--concurrency`、`--no-write`、`--no-cache`、`QUARK_CANCEL_CACHE`）見上方「兩個模組的執行方式 → B」一節。
+- 快取檔 `panhub.shenzjd.com/scripts/quark-cancel-cache.json` 與獨立執行 / 儀表板共用：同一 `pwd_id` 只查一次，第二次起極快（已由 submodule `.gitignore` 排除，不進版本庫）。
+
+**儀表板整合**（`run-quark-dashboard.mjs` v1.2.9 + `dashboard.html` v1.2.1）：
+- `processMovie()` 在取得每個夸克連結後，先呼叫 `isCanceled(pwdId)` 過濾，已失效的不會進入結果。
+- 啟動時先對紀錄檔跑一次 `purgeFile`，清理 resume 沿用、或直接開啟儀表板檢視時既有的已失效連結。
+- 每片 `lastChecked`：片源最後一次被掃描/驗證的 ISO 時間寫入 `quark-search-results.json`（summary 同時加 `lastScanAt`）；每次啟動沿用既有片源時會把 `lastChecked` 刷新為當次啟動時間（因啟動即做失效檢查＝已驗證）。若某片 `lastChecked` 距今超過 `STALE_SCAN_DAYS` 天，即使中文名/英文名/容量皆未變，也重新掃描其全部片源（連結週期性刷新）。
+- 環境變數：`CHECK_CANCELED`(預設 1，設 0 關閉)、`PURGE_ON_START`(預設 1：設 0 跳過啟動前整檔清理，僅在取得連結時即時攔截已失效分享)、`CANCEL_CONCURRENCY`(預設 `ROW_CONCURRENCY*2`)、`QUARK_PURGE_CODES`(預設 `41011,41012,41019`，可設 `41012` 回退舊版僅刪已取消)、`STALE_SCAN_DAYS`(預設 30)。找不到模組時自動降級（檢查停用），不影響搜尋流程。
+
 ## Changelog
+- **quark-cancel-check.mjs v1.1.0 + run-quark-dashboard.mjs v1.2.9：放寬「失效」判定並修快取相容（d18226a28f34 未被刪除）** (2026-08-17)
+  - 回報「`https://pan.quark.cn/s/d18226a28f34` 實際已取消，但程式沒刪掉」。
+  - 根因：該連結 Quark API 回 `41011 分享地址已失效`（HTTP 404），舊版僅把 `41012 好友已取消` 視為應刪除，`41011/41019/41031` 等失效一律保留，故殘留；且 `quark-cancel-cache.json` 已把 `d18226a28f34` 記為 `code 41011 / canceled:false`，即使日後放寬判定，快取仍讓 `purge --no-write` 試算顯示 0。
+  - 修法：`quark-cancel-check.mjs` 升 `v1.1.0`——新增 `QUARK_PURGE_CODES`（預設 `41011,41012,41019`，失效+已取消+過期失效），`checkShare` / `isCanceled` / `purgeFile` 一律以 `isPurgeCode(code)` 判定；`isCanceled` 命中快取時若 `code` 屬當前 `PURGE_CODES` 但舊快取記為 `false`，自動修正為 `true` 並回寫。`--no-write` 試算即從 0 → 876 條。
+  - 已對 `quark-search-results.json` 執行正式 `purge`：移除 **876 條失效連結、影響 124 部影片、對應 554 個失效分享**；`d18226a28f34` 已確認刪除，快取已修正為 `41011/canceled:true`。紀錄檔寫入前已備份 `quark-search-results.json.bak-20260817-124946`。
+  - `run-quark-dashboard.mjs` 同步升 `v1.2.9`（僅版本號，未改邏輯）；`node --check` 兩檔 OK。`QUARK_PURGE_CODES` 已寫入 `.env.example` 與本機 `.env`，如需回退舊版可設 `QUARK_PURGE_CODES=41012`。
+- **run-quark-dashboard.mjs v1.2.8：修復 PURGE_ON_START=0 未生效（仍整檔重掃 3000+ 連結）** (2026-08-17)
+  - 回報「`PURGE_ON_START=0` 還是等了一陣子，為什麼？—— 日誌仍顯示 `[purge] 不重複分享網址 3426 個，開始檢查`」。
+  - 根因：`.env` 解析器原為 `process.env[key]===undefined 才寫入`，但載入順序是「先 `.env.example` 後 `.env`」——`.env.example`（`PURGE_ON_START=1`）已先寫入 `process.env`，導致後載入的本機 `.env`（`PURGE_ON_START=0`）被「已存在不覆蓋」擋掉，開關永遠是 1。
+  - 修法：改為「兩階段覆寫」——啟動前先快照 `process.env`（真實環境變數），載入期間 `.env` 用 `overwrite:true` 允許覆蓋 `.env.example` 的預設值；載完再把快照的真實環境變數蓋回去。最終優先順序為 **真實環境變數（start-dashboard.bat/CI）＞ 本機 `.env` ＞ `.env.example`**，符合文件描述。新增啟動橫幅 `有效開關 CHECK_CANCELED=x PURGE_ON_START=y (原始 "0"/"1")`，便於排錯。
+  - `PURGE_ON_START=0` 時啟動序列改走「已跳過」分支：不打任何 Quark API、不出現 `[purge] 不重複…`，僅在「取得連結時」由 `isCanceled` 即時攔截（紀錄檔裡既有的已取消連結不會被回清）。
+  - 備份舊版 `scripts/run-quark-dashboard.mjs.v1.2.7.bak`；`node --check` OK。
+- **run-quark-dashboard.mjs v1.2.7：啟動前「強制重新驗證清理已取消分享」改由 .env 控制是否執行** (2026-08-17)
+  - 回應「把啟動前清理紀錄檔中的已取消分享（強制重新驗證），改成 .env 可以設定是否要這麼做」。
+  - 新增環境變數 `PURGE_ON_START`（預設 1）：啟動序列中的「清理紀錄檔中既有的已取消分享（force:true 強制整檔重新驗證）」改由其控制——設 `0` 即跳過整檔清理，僅在搜尋「取得連結時」由 `isCanceled` 即時攔截已取消分享。設 0 可省下每次啟動約數十秒的整檔驗證時間，但紀錄檔裡既有的已取消連結不會在啟動時被回清（仍會在下次搜尋命中該片源時被即時過濾）。
+  - 與 `CHECK_CANCELED` 的關係：`CHECK_CANCELED=0` 關閉整個取消檢查功能（含即時攔截與啟動清理）；`CHECK_CANCELED=1` 且 `PURGE_ON_START=1` 才會做啟動前整檔清理。`PURGE_ON_START` 同時寫入 `.env.example` 與本機 `.env`（預設 1）。
+  - 備份舊版 `scripts/run-quark-dashboard.mjs.v1.2.6.bak`；`node --check` OK。
+- **run-quark-dashboard.mjs v1.2.6 + dashboard.html v1.2.1：啟動順序調整——web 介面先開，並即時顯示啟動進度** (2026-08-17)
+  - 回應「執行順序調整：先啟動 web 介面，並在 web 上展示當前進度，不然等待前面處理時間太久，容易讓人誤以為當掉了」。
+  - 重排啟動序列：**先 `server.listen` + 自動開瀏覽器**，再於 web 就緒後依序執行 `ensureBackend` → 清理已取消分享 → `runSearches`（包成 `bootSequence`）。使用者一開瀏覽器立刻看到「啟動中」橫幅，不再因後端/清理耗時而白畫面。
+  - 新增 `status` SSE 事件：後端 `bootStatus(msg, pct, phase)` 在每個前置階段推送 `status:{msg, pct, phase}`，web 介面啟動進度橫幅（旋轉 spinner + 最新訊息 + 百分比）即時更新；`phase==="done"` 或 `reset`/`done` 到達時自動隱藏橫幅。
+  - 中途才連線的瀏覽器：新 `/stream` 連線時補送最新 `state.bootState`（status 事件），不會白屏；`reset` payload 一併帶 `backendUp` 讓後端徽章即時更新。
+  - 備份舊版 `scripts/run-quark-dashboard.mjs.v1.2.5.bak`、`scripts/dashboard.html.v1.2.0.bak`；前後端 `node --check` 均 OK；實跑確認 web 先啟動（HTTP 200 立即回應）、`[boot]` 狀態事件依序推送（準備後端→已就緒→清理→開始搜尋→啟動完成）、HTML 含啟動進度橫幅、SSE 握手即時派發 `hello`+`snapshot`。
+- **run-quark-dashboard.mjs v1.2.5：每次啟動皆做取消分享檢查 + 記錄最後檢查日 + 超過一個月未掃描者自動重掃片源** (2026-08-17)
+  - 回應「每次執行 start-dashboard.bat 都要檢查 cancel-check、記錄最後一次檢查日、超過一個月未更新就掃描該片源、掃描頻率與其他參數改放 .env 統一管理」。
+  - 每次啟動必跑取消分享檢查：啟動前對 `quark-search-results.json` 全量 `purgeFile(force:true)` 重新驗證（沿用 v1.2.4 行為），確保 resume 沿用與直接開啟儀表板都不會再看到已取消連結。
+  - 新增每片 `lastChecked`：片源最後一次被掃描/驗證的 ISO 時間，寫入紀錄檔（summary 同步加 `lastScanAt`）；每次啟動沿用既有片源時會把 `lastChecked` 刷新為當次啟動時間（因啟動即做取消檢查＝已驗證）。
+  - 週期性重掃：resume 沿用條件新增「`lastChecked` 距今未超過 `STALE_SCAN_DAYS` 天」；超過者視為過期，即使中文名/英文名/容量皆未變，也重新掃描其全部片源（連結週期性刷新）。預設 30 天，可由 `.env` 調整。啟動日誌會印出「超過 N 天未掃描者 M 部」。
+  - 統一參數管理：新增自帶 `.env` 解析器（不依賴 dotenv 套件），啟動時自動載入 `panhub.shenzjd.com/.env.example`（發佈範本）與 `panhub.shenzjd.com/.env`（本機，已被 submodule `.gitignore` 排除），優先順序＝真實環境變數＞`.env`＞`.env.example`；所有可調參數（`PANHUB_BASE_URL`/`SOURCE_CSV`/`RECORD_JSON`/`DASHBOARD_PORT`/`ROW_CONCURRENCY`/`PLUGIN_TIMEOUT_MS`/`AUTOSTART_BACKEND`/`ONLY_4K`/`SEARCH_DELAY_MS`/`SEARCH_RETRIES`/`RESUME`/`SEARCH_SRC`/`PLUGINS`/`CHECK_CANCELED`/`CANCEL_CONCURRENCY`/`STALE_SCAN_DAYS`）統一集中於 `.env` / `.env.example`。
+  - 備份舊版 `scripts/run-quark-dashboard.mjs.v1.2.4.bak`；`node --check` OK；實跑確認 `.env`/`.env.example` 載入、版本橫幅 v1.2.5、啟動取消檢查自動觸發、stale 日期計算（40/31 天→重掃、5 天/無日期→沿用）正確。
+- **run-quark-dashboard.mjs v1.2.4 + quark-cancel-check.mjs v1.0.2：啟動清理強制不讀快取，取消分享不再殘留** (2026-08-17)
+  - 回應「新增/既有的連結若被分享者取消，為什麼沒即時刪掉」：實測 `processMovie` 其實會對每條新連結呼叫 `isCanceled` 當場驗證並過濾取消的；但 `quark-cancel-cache.json` 是共用且**永不過期**的快取——某 `pwd_id` 一旦被快取成「有效」，之後不再打 API，分享者事後取消也不會被發現，導致取消連結仍出現在結果（含新增電影）。
+  - 修法：啟動前清理改為 `force:true`——`purgeFile` 對紀錄檔裡**所有**不重複連結重新打 Quark API 驗證、移除已取消的 match 並寫回；同時把快取刷成最新（僅 `force` 模式寫回快取，獨立 `purge --no-cache` 仍不碰快取）。如此每次開機紀錄檔與儀表板都是乾淨的，且後續搜尋的即時檢查也因快取已新鮮而準確。
+  - `quark-cancel-check.mjs` v1.0.2：`isCanceled`/`purgeFile` 新增 `force` 選項（忽略快取、強制重新驗證並寫回快取）。備份 `scripts/quark-cancel-check.mjs.v1.0.1.bak`、`scripts/run-quark-dashboard.mjs.v1.2.3.bak`；兩檔 `node --check` OK。
+- **run-quark-dashboard.mjs v1.2.3 + start-dashboard.bat：CSV 解析容錯，新增/1~2 欄資料不再被靜默略過** (2026-08-17)
+  - 修正 `parseCsvLine`：舊版嚴格要求「中文名,英文名,影片容量」三欄，少一欄就整列 `[warn] 無法解析列，已略過` 並丟掉——這正是使用者新增的 `黑客帝国3：矩阵革命, The Matrix Revolutions`、`盗梦空间, Inception`、`沙丘, Dune (2021)`、`斯巴达300勇士`（僅中文名）等列「沒被搜尋」的真正原因（與 v1.2.2 的 resume 差分邏輯無關）。
+  - 新邏輯容許 1~3 欄：僅中文名（仍以中文名搜尋）、中文名+英文名（容量視為 N/A）、三欄齊全；僅「整列空白」才略過。配合 v1.2.2 的 RESUME 差分，啟動即自動把這些新增列納入搜尋並寫回 `quark-search-results.json`，已有片源且內容未變者維持不動。（舊版因這 13 列被靜默略過，儀表板實際只讀到 209 筆；v1.2.3 起會讀到 source.csv 全部 222 筆。）
+  - 修正 `start-dashboard.bat`：將等待後端的 `powershell ... -Command ^` 多行 `^` 延續改為單行命令，避免 `^` 斷行失敗導致 `tart` / `tionPolicy` 等片段被當成指令而報錯。另協助釋放占用 8080 的舊 dashboard 程序（`node` PID 20220）與其後端（PID 24300），解決 `EADDRINUSE :::8080`，使重新啟動能乾淨綁定。
+  - 備份舊版 `scripts/run-quark-dashboard.mjs.v1.2.2.bak`；`node --check` OK；2/3 欄與 cn-only 邏輯測試通過。
+- **run-quark-dashboard.mjs v1.2.2：差分比對 source.csv，只搜新增/變動列** (2026-08-17)
+  - resume 跳過條件由「有片源即沿用」強化為「有片源『且中文名/英文名/容量皆未變』才沿用」：新增列、或你改了英文名/容量的既有列、或先前無片源者，都會重新搜尋並寫回 `quark-search-results.json`；已經有片源且內容未變的維持不動。啟動日誌明確印出「沿用 X 部 / 待搜 Y 部」。
+  - 備份舊版 `scripts/run-quark-dashboard.mjs.v1.2.1.bak`；`node --check` OK；四種情境（新增/未變/改英文名/無片源）邏輯測試通過。
+- **readme.md：補「兩個模組的執行方式」專節** (2026-08-17)
+  - 將 `run-quark-dashboard.mjs`（含 `start-dashboard.bat` 一鍵方式）與 `quark-cancel-check.mjs`（purge / check 指令、參數、`QUARK_CANCEL_CACHE`）的執行方式集中成獨立一節，方便查找；「已取消分享檢查」段落改為指向該專節，避免重複。
+- **quark-cancel-check.mjs v1.0.1 + run-quark-dashboard.mjs v1.2.1：移入 submodule、自包含發佈** (2026-08-17)
+  - 將 quark-cancel-check.mjs 由 workspace 根目錄移至 `panhub.shenzjd.com/scripts/`（與 dashboard 同目錄），import 路徑由 `../../quark-cancel-check.mjs` 改為 `./quark-cancel-check.mjs`；如此 `publish-dashboard.bat` 推 submodule 時即一併發佈，別人 clone 後開箱即用，不再有「模組未進 git」的缺口。
+  - 快取檔 `quark-cancel-cache.json` 一併移至 `scripts/`（保留既有 ~3000 筆快取），並加入 submodule `.gitignore` 避免被提交。
+  - 模組 v1.0.1：修正獨立 `purge` 的預設紀錄檔路徑——改為從本模組目錄向上查找 `quark-search-results.json`（原寫死 `path.join(__dirname,...)` 在移入 scripts/ 後會指到錯誤位置）。
+  - 備份舊版 `scripts/run-quark-dashboard.mjs.v1.2.0.bak`；`node --check` 兩檔 OK。
+- **quark-cancel-check.mjs v1.0.0 + run-quark-dashboard.mjs v1.2.0：已取消分享檢查（持久化功能）** (2026-08-17)
+  - 需求從「一次性清理」升級為「永久功能」：新增可獨立執行、亦能被主程式引入的檢查模組，直接讀寫 `quark-search-results.json`。
+  - 模組封裝 Quark 分享頁 token API（`code===41012` 判定已取消），提供 `checkShare` / `isCanceled`（帶快取）/ `purgeFile` / CLI（`purge`、`check`）；`purgeFile` 移除已取消的 match 條目並同步 `summary` / `matchCount`。
+  - 主程式 `processMovie()` 在取得 url 時先攔截已取消分享；啟動時對紀錄檔跑一次 `purgeFile` 清理 resume / 既有已取消連結；新增 `CHECK_CANCELED`(1) / `CANCEL_CONCURRENCY` 環境變數，模組缺失自動降級。
+  - 原先的 `check_api.py` / `delete_cancelled.py` 為一次性腳本，已由本模組取代（保留供參考）。
 - **batch-quark-search.mjs v1.1.6 + run-quark-dashboard.mjs v1.0.6：搜尋來源改為全部（修「官網有、腳本 0 筆」）** (2026-08-16)
   - 回應「官網 panhub.shenzjd.com/?q=星球大战7 找得到 9 筆、腳本卻 0 筆」：根因非關鍵字放寬（v1.1.5 已做），而是舊版寫死 `src=plugin&plugins=quark4k` 只搜單一 quark4k 插件；quark4k 對部分關鍵詞會回 0（repo docs 載明「單關鍵詞不可靠」），而官網 `?q=` 預設 `src=all` 搜全部來源故有結果。
   - 兩腳本 `searchOnce` 改為預設 `src=all`（與官網一致，搜 8 個插件 + TG），並新增 `SEARCH_SRC`(all/plugin/tg) 與 `PLUGINS`(留空=全部插件) 環境變數；`res=results` 解析不變（後端對 `res=results` 回 `{total,results}`）。結果仍只保留 `type==="quark"` 連結，輸出性質不變（仍只有夸克連結），但命中率與官網對齊。

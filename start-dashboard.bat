@@ -11,8 +11,7 @@ start "夸克後端" /MIN cmd /c "cd /d %~dp0panhub.shenzjd.com && npm run dev"
 echo       後端已啟動（最小化視窗）
 echo.
 echo [*] 等待後端就緒...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ok=$false; for($i=1;$i -le 60;$i++){ Start-Sleep -Seconds 1; try{ $t=New-Object System.Net.Sockets.TcpClient; $a=$t.BeginConnect('127.0.0.1',4000,$null,$null); if($a.AsyncWaitHandle.WaitOne(800)){ $t.EndConnect($a); $ok=$true }; $t.Close() }catch{} if($ok){break} }; exit $(if($ok){0}else{1})"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ok=$false; for($i=1;$i -le 60;$i++){ Start-Sleep -Seconds 1; try{ $t=New-Object System.Net.Sockets.TcpClient; $a=$t.BeginConnect('127.0.0.1',4000,$null,$null); if($a.AsyncWaitHandle.WaitOne(800)){ $t.EndConnect($a); $ok=$true }; $t.Close() }catch{} if($ok){break} }; if($ok){exit 0}else{exit 1}"
 if errorlevel 1 (
     echo       後端未在 60 秒內就緒，仍嘗試啟動儀表板...
 ) else (
